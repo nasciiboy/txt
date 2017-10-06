@@ -34,6 +34,31 @@ func TestGetLine( t *testing.T ){
   }
 }
 
+func TestGetRawLine( t *testing.T ){
+  data := []struct{
+    input    string
+    output   string
+  } {
+    { "", "" },
+    { "\n\n\n", "\n" },
+    { "line", "line" },
+    { "line\n", "line\n" },
+    { "line\t\v\rline", "line\t\v\rline" },
+    { "line\t\v\nline\n", "line\t\v\n" },
+    { "line\t\v\n\nline\n\n", "line\t\v\n" },
+    { "line\t\v\n\n\tline\n\n\n", "line\t\v\n" },
+    { "\n1\n2\n3\n", "\n" },
+    { "1\n2\n3\n4\n5\n", "1\n" },
+  }
+
+  for _, d := range data {
+    output := GetRawLine( d.input )
+    if output != d.output {
+      t.Errorf( "GetRawLine( %q ) \nreturn   %q\nexpected %q", d.input, output, d.output )
+    }
+  }
+}
+
 func TestGetLines( t *testing.T ){
   data := []struct{
     input    string
@@ -61,6 +86,32 @@ func TestGetLines( t *testing.T ){
   }
 }
 
+func TestGetRawLines( t *testing.T ){
+  data := []struct{
+    input    string
+    output   []string
+    lines    int
+  } {
+    { "", []string{}, 0 },
+    { "\n", []string{ "\n" }, 1 },
+    { "\n\n\n", []string{ "\n", "\n", "\n" }, 3 },
+    { "\n\ta", []string{ "\n", "\ta" }, 2 },
+    { "line", []string{ "line" }, 1 },
+    { "line\t\v\rline", []string{ "line\t\v\rline" }, 1 },
+    { "line\t\v\rline\n", []string{ "line\t\v\rline\n" }, 1 },
+    { "line\t\v\rline\n\n", []string{ "line\t\v\rline\n", "\n", }, 2 },
+    { "line\t\v\rline\n\n\n", []string{ "line\t\v\rline\n", "\n", "\n" }, 3 },
+    { "\n1\n2\n3\n", []string{ "\n", "1\n", "2\n", "3\n" }, 4 },
+    { "1\n2\n3\n4\n5\n", []string{ "1\n", "2\n", "3\n", "4\n", "5\n" }, 5 },
+  }
+
+  for _, d := range data {
+    output := GetRawLines( d.input )
+    if !cmpStringArray( output, d.output ) || len( output ) != d.lines {
+      t.Errorf( "GetLines( %q ) \nreturn   [%d] %q\nexpected [%d] %q", d.input, len(output), output, d.lines, d.output )
+    }
+  }
+}
 
 func TestTokenize( t *testing.T ){
   data := []struct{
@@ -182,6 +233,7 @@ func TestLinelize( t *testing.T ){
   } {
     { "", "" },
     { " ", "" },
+    { " hola\t\n", "hola" },
     { "\n\n\n", "" },
     { " \n\ta", "a" },
     { " \t\ta", "a" },
@@ -216,6 +268,8 @@ func TestSpaceSwap( t *testing.T ){
     { " \t\ta\ta", " a a" },
     { "line", "line" },
     { "line\n", "line " },
+    { " hola\t\n", " hola " },
+    { " hola  \t\n"," hola " },
     { "line\t\v\rline", "line line" },
     { "line\t\v\nline\n", "line line " },
     { "  \nline\t\v\n\nline\n\n", " line line " },
@@ -319,10 +373,80 @@ func TestDragTextByIndent( t *testing.T ){
     { "hola\nhi\n hoy", 0, "hola\nhi\n hoy", 12 },
     { "  hola\n   hi\n hoy", 2, "  hola\n   hi\n", 13 },
     { "  hola\n   hi\n\n   hoy", 2, "  hola\n   hi\n", 13 },
+    { `  Nullamの私はあなたの意見を聞いた。 Fusce suscipit、wisi nec facilisis
+  facilisis、est dui fermentum leo、欲求不満の欲求が欲しかった。 Nunc portaはテ
+  ルトゥスです。 Nunc rutrum turpis sed pede。 bibendumになる Aliquam posuere。
+  Nunc aliquet、augue nec adipiscing interdum、lacus tellus malesuada massa、お
+  よび他のものは、他のものとは異なる。 Pellentesque condimentum、magna ut
+  susipipit hendrerit、ipsum augue ornare nulla、non luctus diam neque sit amet
+  urna。 Curabiturは前庭ロレムを訴える。 虚脱、リベロの非暴行、巨大orciの痛み、
+  nepta nea naclacinia eros。 Sid id ligulaはest convallis temporです。
+  Curabitur lacinia pulvinar nibh。 サピエンナム。
+counte
+out
+`, 2, `  Nullamの私はあなたの意見を聞いた。 Fusce suscipit、wisi nec facilisis
+  facilisis、est dui fermentum leo、欲求不満の欲求が欲しかった。 Nunc portaはテ
+  ルトゥスです。 Nunc rutrum turpis sed pede。 bibendumになる Aliquam posuere。
+  Nunc aliquet、augue nec adipiscing interdum、lacus tellus malesuada massa、お
+  よび他のものは、他のものとは異なる。 Pellentesque condimentum、magna ut
+  susipipit hendrerit、ipsum augue ornare nulla、non luctus diam neque sit amet
+  urna。 Curabiturは前庭ロレムを訴える。 虚脱、リベロの非暴行、巨大orciの痛み、
+  nepta nea naclacinia eros。 Sid id ligulaはest convallis temporです。
+  Curabitur lacinia pulvinar nibh。 サピエンナム。
+`, 781 },
   }
 
   for _, d := range data {
     output, l := DragTextByIndent( d.input, d.n )
+    if output != d.output || l != d.l {
+      t.Errorf( "DragTextByIndent( %q, %d ) \nreturn   [%d] %q\nexpected [%d] %q", d.input, d.n, l, output, d.l, d.output )
+    }
+  }
+}
+
+func TestDragLineAndTextByIndent( t *testing.T ){
+  data := []struct{
+    input    string
+    n        int
+    output   string
+    l        int
+  } {
+    { "", 0, "", 0 },
+    { "", 4, "", 0 },
+    { "hola", 4, "hola", 4 },
+    { "hola", 0, "hola", 4 },
+    { "hola\nhi\n hoy", 0, "hola\nhi\n hoy", 12 },
+    { "hola\n  hi\n  hoy", 2, "hola\n  hi\n  hoy", 15 },
+    { "hola\nhi\n  hoy", 2, "hola\n", 5 },
+    { "hola\nhi\nhoy", 2, "hola\n", 5 },
+    { "hola\n  ni\nhoy", 2, "hola\n  ni\n", 10 },
+    { "  hola\n   hi\n hoy", 2, "  hola\n   hi\n", 13 },
+    { "  hola\n   hi\n\n   hoy", 2, "  hola\n   hi\n", 13 },
+    { `  Nullamの私はあなたの意見を聞いた。 Fusce suscipit、wisi nec facilisis
+  facilisis、est dui fermentum leo、欲求不満の欲求が欲しかった。 Nunc portaはテ
+  ルトゥスです。 Nunc rutrum turpis sed pede。 bibendumになる Aliquam posuere。
+  Nunc aliquet、augue nec adipiscing interdum、lacus tellus malesuada massa、お
+  よび他のものは、他のものとは異なる。 Pellentesque condimentum、magna ut
+  susipipit hendrerit、ipsum augue ornare nulla、non luctus diam neque sit amet
+  urna。 Curabiturは前庭ロレムを訴える。 虚脱、リベロの非暴行、巨大orciの痛み、
+  nepta nea naclacinia eros。 Sid id ligulaはest convallis temporです。
+  Curabitur lacinia pulvinar nibh。 サピエンナム。
+counte
+out
+`, 2, `  Nullamの私はあなたの意見を聞いた。 Fusce suscipit、wisi nec facilisis
+  facilisis、est dui fermentum leo、欲求不満の欲求が欲しかった。 Nunc portaはテ
+  ルトゥスです。 Nunc rutrum turpis sed pede。 bibendumになる Aliquam posuere。
+  Nunc aliquet、augue nec adipiscing interdum、lacus tellus malesuada massa、お
+  よび他のものは、他のものとは異なる。 Pellentesque condimentum、magna ut
+  susipipit hendrerit、ipsum augue ornare nulla、non luctus diam neque sit amet
+  urna。 Curabiturは前庭ロレムを訴える。 虚脱、リベロの非暴行、巨大orciの痛み、
+  nepta nea naclacinia eros。 Sid id ligulaはest convallis temporです。
+  Curabitur lacinia pulvinar nibh。 サピエンナム。
+`, 781 },
+  }
+
+  for _, d := range data {
+    output, l := DragLineAndTextByIndent( d.input, d.n )
     if output != d.output || l != d.l {
       t.Errorf( "DragTextByIndent( %q, %d ) \nreturn   [%d] %q\nexpected [%d] %q", d.input, d.n, l, output, d.l, d.output )
     }
@@ -338,12 +462,27 @@ func TestDragAllTextByIndent( t *testing.T ){
   } {
     { "", 0, "", 0 },
     { "", 4, "", 0 },
+    { "\n hola", 4, "\n", 1 },
     { "hola", 4, "", 0 },
     { "hola", 0, "hola", 4 },
     { "hola\nhi\n hoy", 0, "hola\nhi\n hoy", 12 },
     { "  hola\n   hi\n hoy", 2, "  hola\n   hi\n", 13 },
     { "  hola\n   hi\n\n   hoy", 2, "  hola\n   hi\n\n   hoy", 20 },
     { "  hola\n\n\n\t  hi\n\n   hoy", 2, "  hola\n\n\n\t  hi\n\n   hoy", 22 },
+    { "\n\nhola\n\n\n\t  hi\n\n   hoy", 2, "\n\n", 2 },
+    { "\n\n  hola\n\n\n\t  hi\n\n   hoy", 2, "\n\n  hola\n\n\n\t  hi\n\n   hoy", 24 },
+    { "\n\n  hola\n\n\n\t  hi\n..hoy", 2, "\n\n  hola\n\n\n\t  hi\n", 17 },
+    { `  01 Lorem ipsum es el texto que se usa habitualmente en diseño gráfico en
+  demostraciones de tipografías o de borradores de diseño para probar el diseño
+  visual antes de insertar el texto final.
+
+..figure > 02`, 2,
+`  01 Lorem ipsum es el texto que se usa habitualmente en diseño gráfico en
+  demostraciones de tipografías o de borradores de diseño para probar el diseño
+  visual antes de insertar el texto final.
+
+`, 204 },
+
   }
 
   for _, d := range data {
@@ -400,7 +539,7 @@ func SpaceSwapBuffer( str, swap string ) string {
   for i := 0; i < len( str );  {
     switch str[i] {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
-      i += countInitSpaces( str[i:] )
+      i += CountInitSpaces( str[i:] )
       k.WriteString( swap )
     default: k.WriteByte( str[i] ); i++
     }
@@ -423,7 +562,7 @@ func SpaceSwapString( str, swap string ) string {
   for i := 0; i < len( str );  {
     switch str[i] {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
-      i += countInitSpaces( str[i:] )
+      i += CountInitSpaces( str[i:] )
       k += swap
     default: k += str[i:i+1]; i++
     }
@@ -446,7 +585,7 @@ func SpaceSwapFor( str, swap string ) string {
   for ; i < len( str );  {
     switch str[i] {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
-      i += countInitSpaces( str[i:] )
+      i += CountInitSpaces( str[i:] )
       for h := 0; h < len( swap ); h++ {
         k[j] = swap[h]; j++
       }

@@ -10,12 +10,37 @@ func GetLine( str string ) (string, int) {
   return str, len( str )
 }
 
+func GetRawLine( str string ) string {
+  for i, c := range str {
+    if c == '\n' {
+      return str[:i + 1]
+    }
+  }
+
+  return str
+}
+
 func GetLines( str string ) []string {
   result := make( []string, 0, 64 )
   last := 0;
   for i, c := range str {
     if c == '\n' {
       result = append( result, str[last:i] )
+      last = i + 1
+    }
+  }
+
+  if last < len( str ) { result = append( result, str[last:] ) }
+
+  return result
+}
+
+func GetRawLines( str string ) []string {
+  result := make( []string, 0, 64 )
+  last := 0;
+  for i, c := range str {
+    if c == '\n' {
+      result = append( result, str[last:i + 1] )
       last = i + 1
     }
   }
@@ -34,6 +59,17 @@ func RmSpacesAtEnd( str string ) string {
   }
 
   return ""
+}
+
+func HasOnlySpaces( str string ) bool {
+  for _, c := range str {
+    switch c {
+    case ' ', '\t', '\n', '\v', '\f', '\r' : continue
+    default: return false
+    }
+  }
+
+  return true
 }
 
 func RmSpacesAtStartup( str string ) string {
@@ -76,9 +112,8 @@ func SpaceSwap( str, swap string ) string {
   for ; i < len( str );  {
     switch str[i] {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
-      i += countInitSpaces( str[i:] )
-      copy( k[j:], swap[0:] )
-      j += len( swap )
+      i += CountInitSpaces( str[i:] )
+      j += copy( k[j:], swap )
     default: k[j] = str[i]; j++; i++
     }
   }
@@ -90,7 +125,7 @@ func countSpacesRegions( str string ) (n int) {
   for i := 0; i < len( str ); i++ {
     switch str[i] {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
-      i += countInitSpaces( str[i:] )
+      i += CountInitSpaces( str[i:] )
       n++
     }
   }
@@ -130,11 +165,53 @@ func CountIndentSpaces( str string ) int {
   return len(str)
 }
 
+func RmInitRect( str string, width int ) string {
+  i, j, k := 0, 0, make( []byte, len( str ) )
+
+  for l, clean := len( str ), 2; i < l; i++ {
+    if str[ i ] == '\n' {
+      k[j] = '\n'
+      j++
+
+      clean = 2
+      continue
+    }
+
+    if clean != 0 {
+      clean--
+      continue
+    }
+
+    k[j] = str[i]
+    j++
+  }
+
+  return string( k[:j] )
+}
+
 func DragTextByIndent( str string, indent int ) (string, int) {
   for init, width, line := 0, 0, ""; init < len(str); {
     line, width = GetLine( str[init:] )
 
-    if countInitSpaces( line ) < indent {
+    if CountInitSpaces( line ) < indent {
+      return str[:init], init
+    }
+
+    init += width
+  }
+
+  return str, len(str)
+}
+
+func DragLineAndTextByIndent( str string, indent int ) (string, int) {
+  line, width := GetLine( str )
+
+  if HasOnlySpaces( line ) { return line, width }
+
+  for init := width; init < len(str); {
+    line, width = GetLine( str[init:] )
+
+    if CountInitSpaces( line ) < indent {
       return str[:init], init
     }
 
@@ -148,7 +225,7 @@ func DragAllTextByIndent( str string, indent int ) (string, int) {
   for init, width, line := 0, 0, ""; init < len(str); {
     line, width = GetLine( str[init:] )
 
-    if countInitSpaces( line ) >= indent || len(line) == 0 {
+    if CountInitSpaces( line ) >= indent || len(line) == 0 {
       init += width
       continue
     }
@@ -159,7 +236,7 @@ func DragAllTextByIndent( str string, indent int ) (string, int) {
   return str, len(str)
 }
 
-func countInitChars( str string ) int {
+func CountInitChars( str string ) int {
   for i, c := range str {
     switch c {
     case ' ', '\t', '\n', '\v', '\f', '\r' : return i
@@ -169,7 +246,7 @@ func countInitChars( str string ) int {
   return len( str )
 }
 
-func countInitSpaces( str string ) int {
+func CountInitSpaces( str string ) int {
   for i, c := range str {
     switch c {
     case ' ', '\t', '\n', '\v', '\f', '\r' :
@@ -185,8 +262,8 @@ func Tokenize( str string ) []string {
 
   i, w, max := 0, 0, len( str )
   for i < max {
-    i += countInitSpaces( str[i:] )
-    w  = countInitChars ( str[i:] )
+    i += CountInitSpaces( str[i:] )
+    w  = CountInitChars ( str[i:] )
 
     if w > 0 {
       r = append( r, str[i:i+w] )
