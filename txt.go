@@ -193,7 +193,7 @@ func DragTextByIndent( str string, indent int ) (string, int) {
   for init, width, line := 0, 0, ""; init < len(str); {
     line, width = GetLine( str[init:] )
 
-    if CountInitSpaces( line ) < indent {
+    if HasOnlySpaces( line ) || CountInitSpaces( line ) < indent {
       return str[:init], init
     }
 
